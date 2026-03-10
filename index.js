@@ -101,4 +101,12 @@ app.listen(PORT, () => {
     console.log('Server running on port ' + PORT);
 });
 
+// Keep server awake on Render free tier
+const RENDER_URL = process.env.RENDER_EXTERNAL_URL || '';
+if (RENDER_URL) {
+    setInterval(() => {
+        axios.get(RENDER_URL).catch(() => {});
+    }, 25000);
+}
+
 client.initialize();
