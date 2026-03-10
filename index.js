@@ -39,7 +39,7 @@ client.on('qr', (qr) => {
 client.on('ready', () => {
     botStatus = 'ready';
     latestQR = null;
-    console.log('✅ WhatsApp bot is ready!');
+    console.log('WhatsApp bot is ready!');
 });
 
 client.on('disconnected', (reason) => {
@@ -48,67 +48,57 @@ client.on('disconnected', (reason) => {
 });
 
 client.on('message', async (message) => {
-    const chat = await message.getChat();
-    if (chat.isGroup && chat.name === GROUP_NAME) {
-        console.log(`📩 New message from ${chat.name}: ${message.body}`);
-        if (N8N_WEBHOOK_URL) {
-            await axios.post(N8N_WEBHOOK_URL, {
-                message: message.body,
-                sender: message.author,
-                groupName: chat.name,
-                timestamp: message.timestamp
-            });
+    try {
+        const chat = await message.getChat();
+        if (chat.isGroup && chat.name === GROUP_NAME) {
+            console.log('New message from ' + chat.name + ': ' + message.body);
+            if (N8N_WEBHOOK_URL) {
+                await axios.post(N8N_WEBHOOK_URL, {
+                    message: message.body,
+                    sender: message.author,
+                    groupName: chat.name,
+                    timestamp: message.timestamp
+                });
+            }
         }
+    } catch (err) {
+        console.log('Message error:', err.message);
     }
 });
 
 app.post('/send', async (req, res) => {
-    const { groupName, message } = req.body;
-    const chats = await client.getChats();
-    const group = chats.find(c => c.isGroup && c.name === groupName);
-    if (group) {
-        await group.sendMessage(message);
-        res.json({ success: true });
-    } else {
-        res.status(404).json({ error: 'Group not found' });
+    try {
+        const { groupName, message } = req.body;
+        const chats = await client.getChats();
+        const group = chats.find(c => c.isGroup && c.name === groupName);
+        if (group) {
+            await group.sendMessage(message);
+            res.json({ success: true });
+        } else {
+            res.status(404).json({ error: 'Group not found' });
+        }
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 
-// Visit this URL in browser to see QR code
 app.get('/qr', (req, res) => {
     if (botStatus === 'ready') {
-        return res.send('<h1>✅ Bot is connected and ready!</h1>');
+        return res.send('<h1>Bot is connected and ready!</h1>');
     }
     if (!latestQR) {
         return res.send('<h1>QR not ready yet. Refresh in 10 seconds...</h1>');
     }
-    res.send(`
-        <html>
-        <body style="background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh">
-        <h2 style="color:white">Scan with WhatsApp</h2>
-        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQR)}" />
-        <p style="color:white">Refresh if expired</p>
-        </body>
-        </html>
-    `);
+    res.send('<html><body style="background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh"><h2 style="color:white">Scan with WhatsApp</h2><img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(latestQR) + '" /><p style="color:white">Refresh page if expired</p></body></html>');
 });
 
 app.get('/', (req, res) => {
-    res.json({ status: 'Bot is running!', botStatus, qrAvailable: !!latestQR });
+    res.json({ status: 'Bot is running!', botStatus: botStatus, qrAvailable: !!latestQR });
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
+    console.log('Server running on port ' + PORT);
 });
 
 client.initialize();
-```
-
----
-
-### The key addition — `/qr` endpoint
-
-After deploying, instead of hunting for QR in logs, just visit:
-```
-https://grocery-bot1.onrender.com/qr
