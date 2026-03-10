@@ -9,6 +9,9 @@ app.use(express.json());
 const N8N_WEBHOOK_URL = process.env.N8N_WEBHOOK_URL || '';
 const GROUP_NAME = process.env.GROUP_NAME || 'Grocery Orders';
 
+let latestQR = null;
+let botStatus = 'initializing';
+
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
@@ -27,12 +30,21 @@ const client = new Client({
 });
 
 client.on('qr', (qr) => {
-    console.log('📱 Scan this QR code with WhatsApp:');
+    latestQR = qr;
+    botStatus = 'waiting_for_scan';
+    console.log('==== QR CODE GENERATED - VISIT /qr TO SCAN ====');
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
+    botStatus = 'ready';
+    latestQR = null;
     console.log('✅ WhatsApp bot is ready!');
+});
+
+client.on('disconnected', (reason) => {
+    botStatus = 'disconnected';
+    console.log('Bot disconnected:', reason);
 });
 
 client.on('message', async (message) => {
@@ -62,8 +74,27 @@ app.post('/send', async (req, res) => {
     }
 });
 
+// Visit this URL in browser to see QR code
+app.get('/qr', (req, res) => {
+    if (botStatus === 'ready') {
+        return res.send('<h1>✅ Bot is connected and ready!</h1>');
+    }
+    if (!latestQR) {
+        return res.send('<h1>QR not ready yet. Refresh in 10 seconds...</h1>');
+    }
+    res.send(`
+        <html>
+        <body style="background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh">
+        <h2 style="color:white">Scan with WhatsApp</h2>
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(latestQR)}" />
+        <p style="color:white">Refresh if expired</p>
+        </body>
+        </html>
+    `);
+});
+
 app.get('/', (req, res) => {
-    res.json({ status: 'Bot is running!' });
+    res.json({ status: 'Bot is running!', botStatus, qrAvailable: !!latestQR });
 });
 
 const PORT = process.env.PORT || 3000;
@@ -72,3 +103,12 @@ app.listen(PORT, () => {
 });
 
 client.initialize();
+```
+
+---
+
+### The key addition — `/qr` endpoint
+
+After deploying, instead of hunting for QR in logs, just visit:
+```
+https://grocery-bot1.onrender.com/qr
