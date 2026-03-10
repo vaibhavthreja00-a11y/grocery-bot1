@@ -27,7 +27,7 @@ nixPkgs = [
 ]
 
 [phases.install]
-cmds = ["npm install"]
+cmds = ["npm install", "which chromium || which chromium-browser || find / -name 'chromium' -type f 2>/dev/null | head -5"]
 
 [phases.build]
 cmds = ["echo 'No build step needed'"]
@@ -37,5 +37,4 @@ cmd = "npm start"
 
 [variables]
 PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = "true"
-PUPPETEER_EXECUTABLE_PATH = "/run/current-system/sw/bin/chromium"
 NODE_ENV = "production"
